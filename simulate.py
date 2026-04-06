@@ -1,7 +1,6 @@
-import time
 import sys
 
-# ── Instruction set ──────────────────────────────────────────────────────────
+# Instruction set
 #
 #  8-bit instruction word: [opcode 4 bits | operand 4 bits]
 #
@@ -19,8 +18,6 @@ import sys
 #  Memory:    16 locations, each 8-bit (holds instructions or data).
 #  Flags:     zero_flag set after ADDI, ADD, LOAD when result == 0.
 #  Halt:      JMP to its own address (self-loop).
-#
-# ── Encoder helpers ──────────────────────────────────────────────────────────
 
 def enc_mov(rd, rs):
     return (0 << 4) | ((rd & 3) << 2) | (rs & 3)
@@ -46,8 +43,6 @@ def enc_jz(addr):
 def enc_out(rd):
     return (7 << 4) | ((rd & 3) << 2)
 
-# ── Disassembler ─────────────────────────────────────────────────────────────
-
 def disasm(instr):
     op  = (instr >> 4) & 0xF
     opr = instr & 0xF
@@ -62,8 +57,6 @@ def disasm(instr):
     if op == 6: return f"JZ    {opr}"
     if op == 7: return f"OUT   R{rd}"
     return "????"
-
-# ── CPU step ─────────────────────────────────────────────────────────────────
 
 def cpu_step(reg, mem, pc, zf):
     instr = mem[pc]
@@ -104,8 +97,6 @@ def cpu_step(reg, mem, pc, zf):
     if not jumped and not halted:
         pc = (pc + 1) & 0xF
     return reg, mem, pc, zf, instr, out_val, halted
-
-# ── Terminal renderer ─────────────────────────────────────────────────────────
 
 OPNAMES = ["MOV ","ADDI","ADD ","LOAD","STOR","JMP ","JZ  ","OUT "]
 
@@ -152,9 +143,7 @@ def render_frame(reg, mem, pc, zf, last_out, instr, cycle, halted):
     out.append("")
     return "\n".join(out)
 
-# ── Runner ───────────────────────────────────────────────────────────────────
-
-def run(program, delay=0.9, max_cycles=200):
+def run(program, max_cycles=200):
     mem = [0] * 16
     for i, v in enumerate(program[:16]):
         mem[i] = v & 0xFF
@@ -176,50 +165,46 @@ def run(program, delay=0.9, max_cycles=200):
         sys.stdout.flush()
         if halted:
             break
-        time.sleep(delay)
-
-# ── Programs ─────────────────────────────────────────────────────────────────
-#
-#  ADDI immediate is 2-bit (0-3) because 2 bits go to rd and 2 to imm.
-#  To load larger values, chain ADDI calls.
-#  Subtract 1 trick: add 15 (= -1 mod 16).  Load 15 via five ADDI R,3 calls.
+        input()
+    print("\nExecution finished. Press Enter to exit.", end="")
+    input()
 
 def make_add_3_5():
     return [
-        enc_addi(0, 3),   # addr 0: R0 = 0+3 = 3
-        enc_addi(1, 3),   # addr 1: R1 = 0+3 = 3
-        enc_addi(1, 2),   # addr 2: R1 = 3+2 = 5
-        enc_add(0, 1),    # addr 3: R0 = 3+5 = 8
-        enc_out(0),       # addr 4: display 8
-        enc_jmp(5),       # addr 5: halt (self-loop)
+        enc_addi(0, 3),
+        enc_addi(1, 3),
+        enc_addi(1, 2),
+        enc_add(0, 1),
+        enc_out(0),
+        enc_jmp(5),
     ]
 
 def make_countdown():
     return [
-        enc_addi(0, 3),   # addr  0: R0 = 3  (counter)
-        enc_addi(1, 3),   # addr  1: R1 = 3  \
-        enc_addi(1, 3),   # addr  2: R1 = 6   \
-        enc_addi(1, 3),   # addr  3: R1 = 9    > R1 = 15 (the -1 addend, two's complement)
-        enc_addi(1, 3),   # addr  4: R1 = 12  /
-        enc_addi(1, 3),   # addr  5: R1 = 15 /
-        enc_out(0),       # addr  6: loop start -- output counter
-        enc_add(0, 1),    # addr  7: R0 = R0 + 15 = R0 - 1 (4-bit wrap)
-        enc_jz(10),       # addr  8: if R0 == 0 jump to finish
-        enc_jmp(6),       # addr  9: else loop back
-        enc_out(0),       # addr 10: output final 0
-        enc_jmp(11),      # addr 11: halt
+        enc_addi(0, 3),
+        enc_addi(1, 3),
+        enc_addi(1, 3),
+        enc_addi(1, 3),
+        enc_addi(1, 3),
+        enc_addi(1, 3),
+        enc_out(0),
+        enc_add(0, 1),
+        enc_jz(10),
+        enc_jmp(6),
+        enc_out(0),
+        enc_jmp(11),
     ]
 
 def make_store_load():
     return [
-        enc_addi(0, 3),   # addr 0: R0 = 3
-        enc_addi(0, 3),   # addr 1: R0 = 6
-        enc_store(0, 3),  # addr 2: mem[3] = 6
-        enc_addi(0, 1),   # addr 3: R0 = 7 (mem[3] unchanged)
-        enc_load(2, 3),   # addr 4: R2 = mem[3] = 6
-        enc_add(0, 2),    # addr 5: R0 = 7 + 6 = 13
-        enc_out(0),       # addr 6: display 13
-        enc_jmp(7),       # addr 7: halt
+        enc_addi(0, 3),
+        enc_addi(0, 3),
+        enc_store(0, 3),
+        enc_addi(0, 1),
+        enc_load(2, 3),
+        enc_add(0, 2),
+        enc_out(0),
+        enc_jmp(7),
     ]
 
 PROGRAMS = {
@@ -229,17 +214,12 @@ PROGRAMS = {
 }
 
 if __name__ == "__main__":
-    print("\n  Tiny RISC-4 CPU Simulator")
+    print("\n  Tiny RISC-4 CPU Simulator (step on Enter)")
     print("  " + "=" * 36)
     for k, (name, _) in PROGRAMS.items():
         print(f"  {k}) {name}")
     print()
-    choice = input("  Choose program [1/2/3, default 1]: ").strip() or "1"
+    choice = input("  Choose program (1): ").strip() or "1"
     _, prog_fn = PROGRAMS.get(choice, PROGRAMS["1"])
-    try:
-        raw = input("  Step delay in seconds [default 0.9]: ").strip()
-        delay = float(raw) if raw else 0.9
-    except ValueError:
-        delay = 0.9
     print()
-    run(prog_fn(), delay=delay)
+    run(prog_fn())
